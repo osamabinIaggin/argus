@@ -1,0 +1,17 @@
+# Live streaming pipeline — Phase 1 (ingest) dependencies.
+# Installed into a dedicated python3.12 venv (NOT system python 3.14, which the
+# ML stack — torch/ultralytics — does not yet have wheels for).
+#
+#   python3.12 -m venv .venv
+#   ./.venv/bin/pip install -r streaming/requirements.txt
+
+av>=16,<17          # PyAV — FFmpeg bindings for decode (devices + network streams)
+numpy>=2.1          # frame arrays
+
+# Dev
+pytest>=8           # drop-stale / reconnect unit tests
+
+# --- added in later phases (kept here as a roadmap) ---
+# ultralytics       # Tier 1: YOLO + ByteTrack  (needs python<=3.13)
+# torch             # Tier 1 backend (MPS on Apple Silicon)
+# (Tier 2 VLM is reached via Ollama / MLX / Gemini, not a pip dep here)
