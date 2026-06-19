@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-page: #FAF9F6;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F3F1EC;
+  --color-divider: #E9E5DE;
+  --color-text-1: #1F1F1E;
+  --color-text-2: #6B6966;
+  --color-text-3: #A09C97;
+  --color-accent: #DA7756;
+  --color-accent-dark: #C4633D;
+  --color-success: #2D9E6B;
+  --color-warning: #D4901F;
+  --color-error: #C94C3A;
+  --color-info: #3B7DD8;
+}
+
+/* ── Dark theme ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --color-page: #0f0f10;
+  --color-surface: #1a1a1b;
+  --color-surface-2: #242425;
+  --color-divider: #2e2e30;
+  --color-text-1: #fafafa;
+  --color-text-2: #a1a1aa;
+  --color-text-3: #71717a;
+  --color-accent: #DA7756;
+  --color-accent-dark: #C4633D;
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+}
+
+[data-theme="dark"] body {
+  background-color: #0f0f10;
+  color: #fafafa;
+}
+
+[data-theme="dark"] * {
+  border-color: #2e2e30;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
+  background-color: #FAF9F6;
+  color: #1F1F1E;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  border-color: #E9E5DE;
+}
+
+#root {
+  overflow-x: hidden;
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-bar {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #DA7756 25%,
+    #E89070 50%,
+    #DA7756 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.fade-in        { animation: fadeIn      0.2s ease-out both; }
+.fade-up        { animation: fadeUp      0.3s ease-out both; }
+.scale-in       { animation: scaleIn     0.2s ease-out both; }
+.slide-in-left  { animation: slideInLeft  0.2s ease-out both; }
+.slide-in-right { animation: slideInRight 0.2s ease-out both; }
+
+/* Staggered children: add [--stagger:N] inline style, delay = N * 40ms */
+.stagger { animation-delay: calc(var(--stagger, 0) * 40ms); }
+
+/* ── Card hover lift ─────────────────────────────────────────────────────── */
+.card-hover {
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px -4px rgba(0,0,0,0.08);
+}
+
+/* ── Skeleton loader ─────────────────────────────────────────────────────── */
+@keyframes skeleton-pulse {
+  0%, 100% { background-color: #E9E5DE; }
+  50%       { background-color: #F3F1EC; }
+}
+[data-theme="dark"] .skeleton {
+  animation-name: skeleton-pulse-dark;
+}
+@keyframes skeleton-pulse-dark {
+  0%, 100% { background-color: #242425; }
+  50%       { background-color: #2e2e30; }
+}
+.skeleton {
+  border-radius: 6px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* ── Progress bar smooth fill ────────────────────────────────────────────── */
+.progress-fill {
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Marquee scroll (use cases) ───────────────────────────────────────────── */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 45s linear infinite;
+}
+
+.animate-marquee-reverse {
+  animation: marquee 50s linear infinite reverse;
+}
+
+/* ── Scrollbar styling ───────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #E9E5DE; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #A09C97; }
+
+/* ── PWA / safe area ─────────────────────────────────────────────────────── */
+/* Ensure body/root fill the full screen including notch areas */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  body {
+    /* Prevent rubber-band scroll bounce on iOS standalone */
+    overscroll-behavior: none;
+  }
+}

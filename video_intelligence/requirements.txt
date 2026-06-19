@@ -1,0 +1,43 @@
+# API
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+
+# Job queue
+celery==5.4.0
+redis==5.0.8
+
+# Video processing
+opencv-python==4.10.0.84
+scenedetect[opencv]==0.6.4
+ffmpeg-python==0.2.0
+
+# ML
+ultralytics==8.2.90
+
+# Vision model — google-genai is the new unified SDK (provides google.genai)
+# DO NOT use google-generativeai (old SDK — different module path: google.generativeai)
+# >=1.5.0 required for ThinkingConfig.thinking_budget support
+google-genai>=1.5.0
+
+# Storage + DB
+boto3==1.35.0
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.35
+
+# Auth
+argon2-cffi==23.1.0
+PyJWT==2.8.0
+email-validator==2.2.0
+
+# Push notifications
+firebase-admin==6.5.0
+
+# Utils
+python-dotenv==1.0.1
+pydantic==2.9.2
+pydantic-settings==2.5.2
+httpx>=0.28.1
+aiofiles==24.1.0
+imagehash==4.3.1
+Pillow==10.4.0

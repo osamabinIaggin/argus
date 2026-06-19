@@ -1,0 +1,52 @@
+# Test videos at project root (local only — do not commit)
+/*.mov
+/*.mp4
+/*.m4v
+/*.aac
+
+# macOS
+.DS_Store
+
+# Certs (local/dev)
+*.crt
+
+# Secrets
+.env
+.env.*
+!.env.example
+firebase-service-account.json
+gcloud-adc.json
+*-firebase-adminsdk-*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Node / web build
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime / job output
+output/
+*.log
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Models (auto-downloaded by ultralytics) & large/sample media
+*.pt
+*.onnx
+*.zip
+*.ppm
+*.webm
+*.mkv
+*.avi

@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Dark ngrok-style palette — keep accent from original */
+  --color-bg: #0a0a0b;
+  --color-bg-elevated: #111113;
+  --color-surface: #18181b;
+  --color-surface-2: #27272a;
+  --color-divider: #3f3f46;
+  --color-text-1: #fafafa;
+  --color-text-2: #a1a1aa;
+  --color-text-3: #71717a;
+  --color-accent: #DA7756;
+  --color-accent-glow: #e89070;
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-info: #3b82f6;
+}
+
+* {
+  border-color: #27272a;
+}
+
+body {
+  background-color: #0a0a0b;
+  color: #fafafa;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Marquee scroll */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+
+.animate-marquee-reverse {
+  animation: marquee 45s linear infinite reverse;
+}
+
+/* Glow effects */
+.glow-accent {
+  box-shadow: 0 0 60px -15px rgba(218, 119, 86, 0.4);
+}
+
+.glow-subtle {
+  box-shadow: 0 0 80px -20px rgba(218, 119, 86, 0.15);
+}
+
+/* Hide scrollbar but keep scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #fbbf24 0%, #22c55e 40%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
