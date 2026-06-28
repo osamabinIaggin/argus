@@ -146,6 +146,20 @@ streaming/
 - **Tier-4 seam:** `tracker.events.subscribe(cb)` delivers every event to a sink
   (the future PowerSync push). Subscriber exceptions are isolated.
 
+## Roadmap — researched bleeding-edge upgrades (apply in-phase)
+
+Validated against the live 2026 landscape; each is parked at the phase it belongs
+to so we adopt it where it actually pays off rather than chasing hype everywhere.
+
+| Upgrade | Phase | Status | Notes |
+|---|---|---|---|
+| **YOLO26** (NMS-free, end-to-end) as Tier-1 default | Tier 1 (done) | **applied** | Verified on MPS: ~30fps, 12-18ms, stable ByteTrack ids. Swappable; `yolov8n.pt` stays as offline fallback. |
+| **yolo-mlx** MLX-native backend | Tier 1 | parked | 1.1-2.6x faster than PyTorch-MPS on Apple Silicon. Add as a `Detector` subclass behind the existing ABC. |
+| **RF-DETR** (DINOv2 transformer) | Tier 1 | parked | Leads accuracy/occlusion but heavier & NVIDIA-tuned — a precision-mode swappable option, not the default. |
+| **FastVLM** (Apple, MLX) / **Moondream 0.5-2B** / **MLX-VLM Qwen3-VL** | Tier 2 | parked | Real-time on-device VLMs; FastVLM ~85x faster TTFT. All behind one `SceneUnderstander` interface. Image/KV caching first-class. |
+| **TOON** (Token-Oriented Object Notation) at the LLM boundary | Tier 4 / chat | parked | ~40% fewer tokens, equal/better parse accuracy, on **uniform arrays** (our `entities[]` + event log). Hybrid: TOON for tables, compact JSON for nested/scalar. Keep JSON `snapshot()` for PowerSync/storage. Pure-Python `toon-format` lib. |
+| **Token benchmark** (JSON vs TOON on a real snapshot) | Tier 4 / chat | parked | Adopt TOON on measured numbers, not blog claims. |
+
 ## Tests
 
 ```bash

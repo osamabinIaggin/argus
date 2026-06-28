@@ -17,7 +17,7 @@ Examples (from video_intelligence/, with the streaming venv):
   ./.venv/bin/python -m streaming.run_tier1 --test --seconds 5
 
 Flags:
-  --model PATH     YOLO weights (default yolov8n.pt; swap to yolo11n.pt freely)
+  --model PATH     YOLO weights (default yolo26n.pt, NMS-free; yolov8n.pt etc. work)
   --imgsz N        inference size (default 640; lower = faster)
   --conf F         confidence threshold (default 0.25)
   --classes a,b    restrict to class ids (e.g. 0 for person)
@@ -58,7 +58,7 @@ def main(argv=None) -> int:
     g.add_argument("--video", type=str, help="local video file (loops)")
     g.add_argument("--test", action="store_true", help="synthetic source")
     p.add_argument("--seconds", type=float, default=None)
-    p.add_argument("--model", type=str, default="yolov8n.pt")
+    p.add_argument("--model", type=str, default="yolo26n.pt")
     p.add_argument("--imgsz", type=int, default=640)
     p.add_argument("--conf", type=float, default=0.25)
     p.add_argument("--classes", type=str, default=None, help="comma-separated class ids")
