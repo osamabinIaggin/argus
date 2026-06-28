@@ -4,16 +4,24 @@ The live counterpart to the batch `pipeline/` module. Ingests an *unbounded*
 stream (webcam, iPhone, IP camera, robot) and maintains a continuously-updated
 understanding of what is happening, pushed to clients in real time.
 
-> Status: **Phase 1 (ingest layer) — done & proven.** Tiers 1–3 follow.
+> Status: **Phases 1–3 done & proven.** Ingest, Tier 1 (detection+tracking), and
+> Tier 3 (scene state + event log) run together in real time. Tier 2 (gated VLM)
+> and the PowerSync push are next.
 
 ## Architecture (tiered cascade)
 
 ```
-sources → Tier 1 (YOLO + tracker, always on)   ~real-time, no LLM cost
-        → Tier 2 (gated VLM, on trigger/heartbeat)   ~1 fps, semantic "what's happening"
-        → Tier 3 (scene state + derived event log)
-        → PowerSync → dashboard / chat / robot planner
+sources → Tier 1 (YOLO + tracker, always on)   ~real-time, no LLM cost     [done]
+        → Tier 2 (gated VLM, on trigger/heartbeat)   ~1 fps, semantic        [next]
+        → Tier 3 (scene state + derived event log)                          [done]
+        → PowerSync → dashboard / chat / robot planner                      [next]
 ```
+
+Data flows Tier 1 → Tier 3: the detector emits `DetectionResult`s, the
+`SceneTracker` folds them into the source-of-truth `SceneState`, and the event
+log falls out of state transitions. Tier 2's semantic text is injected into the
+same state via `note_semantic` — it is never on the critical path, so if the VLM
+is down the geometric state stays fully live (just flagged stale).
 
 Two robustness guarantees are built into the ingest base class so every source
 inherits them:
@@ -75,18 +83,68 @@ terminal). Verify the device opens at all with:
 ffmpeg -f avfoundation -framerate 30 -i "0" -frames:v 1 -update 1 -y /tmp/cam.jpg
 ```
 
+## Try it (Phase 3 — scene state, end to end)
+
+Runs source → Tier 1 → Tier 3 together and streams the derived event log. Needs
+the Tier 1 deps (torch/ultralytics) in the venv.
+
+```bash
+# Sample clip with people — no camera needed:
+./.venv/bin/python -m streaming.run_tier3 --video ../stock-footage-lab-*.webm --seconds 12
+
+# Add a restricted zone over the right half (entry → zone_breach events):
+./.venv/bin/python -m streaming.run_tier3 --video ../stock-footage-lab-*.webm \
+    --zone "right_half:restricted:0.5,0,1,1" --seconds 12
+
+# Live camera / iPhone Continuity:
+./.venv/bin/python -m streaming.run_tier3 --device 0
+```
+
+Zone CLI syntax (repeatable): `NAME:KIND:x1,y1,x2,y2`, coords normalized 0..1,
+`KIND` = `area | restricted`. Programmatic polygons go through the `Zone` API.
+
 ## Layout
 
 ```
 streaming/
   frame.py              Frame dataclass (RGB ndarray + seq/ts/pts metadata)
+  detection.py          Tier 1 output: Detection / DetectionResult (model-agnostic)
   sources/
     base.py             FrameSource (supervision + reconnect) + LatestFrameSlot
     pyav_source.py      PyAV adapter: RTSP / network URL / lavfi-test
     ffmpeg_process.py   FFmpeg-subprocess adapter: Mac capture devices (avfoundation)
-  spike.py              Phase 1 CLI harness
-  tests/                drop-stale + reconnect + subprocess-source tests
+  tier1/
+    detector.py         Detector ABC (swappable)
+    yolo_detector.py    YOLO + ByteTrack on MPS
+  scene/                Tier 3 — scene state (source of truth)
+    state.py            Entity / SemanticState / SceneState (+ JSON snapshot)
+    zones.py            Zone (normalized polygons, ray-cast containment)
+    events.py           Event / EventLog (derived, bounded ring + subscribers)
+    tracker.py          SceneTracker — DetectionResults → state → events
+  spike.py              Phase 1 ingest CLI harness
+  run_tier1.py          Phase 2 detection+tracking CLI
+  run_tier3.py          Phase 3 scene-state CLI (source → Tier 1 → Tier 3)
+  tests/                drop-stale + reconnect + subprocess + scene-state tests
 ```
+
+## Tier 3 design (scene state)
+
+- **State is truth, events are derived.** `SceneState` holds current reality
+  (entities, zone occupancy, activity, last semantic read). The event log is
+  produced *only* from transitions in that state.
+- **Debounced lifecycle (robustness).** A new track id is `tentative` until it
+  persists for `confirm_seconds` (default 0.3s) → then `entity_entered` fires
+  once. A vanished entity is kept through `exit_grace_seconds` (default 1.5s)
+  before `entity_exited`, absorbing ByteTrack id flicker so the log stays clean.
+- **Resolution-independent zones.** Polygons live in normalized 0..1 coords, so
+  the same config works at 640×480 or 4K and survives a reconnect at a new size.
+  Membership uses the bottom-center (ground-contact) anchor by default.
+- **Activity** is a smoothed mean of confirmed-entity center speed, banded
+  idle/low/medium/high, emitting `activity_change` on band crossings.
+- **Semantic slot** is owned by Tier 2 via `note_semantic`; Tier 3 only stores
+  it and tracks staleness — graceful degradation if the VLM is down.
+- **Tier-4 seam:** `tracker.events.subscribe(cb)` delivers every event to a sink
+  (the future PowerSync push). Subscriber exceptions are isolated.
 
 ## Tests
 
