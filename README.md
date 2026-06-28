@@ -83,7 +83,7 @@ falls behind, layered with semantic reasoning that fires only when it matters.
 
 ```bash
 git clone https://github.com/osamabinIaggin/argus.git
-cd argus/video_intelligence
+cd argus
 
 # Dedicated inference environment (Apple Silicon)
 python3.12 -m venv .venv
@@ -93,7 +93,7 @@ python3.12 -m venv .venv
 ./.venv/bin/python -m streaming.run_tier3 --device 0
 ```
 
-See [`streaming/README.md`](video_intelligence/streaming/README.md) for sources
+See [`streaming/README.md`](streaming/README.md) for sources
 (iPhone, RTSP, robot), zone configuration, and the semantic layer.
 
 ## Contributing
