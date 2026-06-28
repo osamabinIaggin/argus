@@ -11,7 +11,14 @@ numpy>=2.1          # frame arrays
 # Dev
 pytest>=8           # drop-stale / reconnect unit tests
 
-# --- added in later phases (kept here as a roadmap) ---
-# ultralytics       # Tier 1: YOLO + ByteTrack  (needs python<=3.13)
+# --- Tier 1 (detection + tracking) ---
+# ultralytics       # YOLO26 + ByteTrack  (needs python<=3.13)
 # torch             # Tier 1 backend (MPS on Apple Silicon)
-# (Tier 2 VLM is reached via Ollama / MLX / Gemini, not a pip dep here)
+
+# --- Tier 2 (gated VLM, optional — default backend is FastVLM on MLX) ---
+# Install on an Apple Silicon Mac to enable `--vlm fastvlm`:
+#   ./.venv/bin/pip install mlx-vlm pillow timm
+# mlx-vlm  — MLX inference for VLMs (Apple Silicon only)
+# pillow   — frame ndarray -> PIL image for the model
+# timm     — pulled in by FastVLM's custom processor code (torch already present)
+# The stub backend (`--vlm stub`) and all tests need NONE of the above.

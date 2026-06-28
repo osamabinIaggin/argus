@@ -19,6 +19,10 @@ Examples (from video_intelligence/, with the streaming venv):
   # Live camera / iPhone Continuity:
   ./.venv/bin/python -m streaming.run_tier3 --device 0
 
+  # With Tier 2 semantic understanding (stub = no model; fastvlm = real, on-device):
+  ./.venv/bin/python -m streaming.run_tier3 --video ../stock-footage-lab-*.webm --vlm stub
+  ./.venv/bin/python -m streaming.run_tier3 --device 0 --vlm fastvlm   # needs: pip install mlx-vlm pillow
+
 Zone syntax (repeatable):  NAME:KIND:x1,y1,x2,y2   (coords normalized 0..1,
 KIND = area|restricted). Rectangles only from the CLI; richer polygons go
 through the Zone API directly.
@@ -35,6 +39,7 @@ from streaming.scene import SceneTracker, Zone, ZoneKind
 from streaming.sources.ffmpeg_process import FFmpegProcessSource
 from streaming.sources.pyav_source import PyAVSource
 from streaming.tier1.yolo_detector import YoloDetector
+from streaming.tier2 import StubSceneUnderstander, Tier2Controller
 
 
 def _build_source(args):
@@ -68,6 +73,9 @@ def main(argv=None) -> int:
     p.add_argument("--classes", type=str, default=None, help="comma-separated class ids")
     p.add_argument("--zone", action="append", default=[], help="NAME:KIND:x1,y1,x2,y2")
     p.add_argument("--max-fps", type=float, default=None)
+    p.add_argument("--vlm", choices=["none", "stub", "fastvlm"], default="none",
+                   help="Tier 2 semantic backend (default none)")
+    p.add_argument("--heartbeat", type=float, default=8.0, help="Tier 2 heartbeat seconds")
     args = p.parse_args(argv)
 
     logging.basicConfig(
@@ -87,12 +95,25 @@ def main(argv=None) -> int:
         lambda e: print(f"  ⚡ EVENT {e.type.value:16s} {e.message}")
     )
 
+    # Tier 2 (optional): gated semantic understanding off the critical path.
+    tier2 = None
+    if args.vlm != "none":
+        if args.vlm == "fastvlm":
+            from streaming.tier2 import FastVLMUnderstander
+            understander = FastVLMUnderstander()
+        else:
+            understander = StubSceneUnderstander(latency_s=0.3)
+        tier2 = Tier2Controller(tracker, understander, heartbeat_s=args.heartbeat)
+
     source = _build_source(args)
     stop = {"v": False}
     signal.signal(signal.SIGINT, lambda *_: stop.update(v=True))
 
     source.start()
-    print(f"[tier3] source started; loading model + warming up… zones={[z.name for z in zones]}")
+    if tier2 is not None:
+        tier2.start()
+    print(f"[tier3] source started; loading model + warming up… "
+          f"zones={[z.name for z in zones]} vlm={args.vlm}")
 
     # Warmup (one-time model load / MPS compile / tracker init) — discard timing.
     while not stop["v"]:
@@ -118,6 +139,8 @@ def main(argv=None) -> int:
 
             result = detector.detect(frame)
             state = tracker.update(result)
+            if tier2 is not None:
+                tier2.offer(frame)        # cheap; the worker decides when to look
             processed += 1
 
             now = time.monotonic()
@@ -125,12 +148,17 @@ def main(argv=None) -> int:
                 proc_fps = processed / (now - started)
                 ents = state.confirmed_entities()
                 occ = {k: len(v) for k, v in state.zone_occupancy.items() if v}
+                sem = ""
+                if tier2 is not None:
+                    s = state.semantic
+                    flag = "" if not s.is_stale(now, tracker.semantic_ttl_seconds) else " (stale)"
+                    sem = f" | 💬 {s.text or '…'}{flag}"
                 print(
                     f"[tier3] proc_fps={proc_fps:5.1f} "
                     f"entities={len(ents):2d} "
                     f"activity={state.activity_label:6s}({state.activity_level:.3f}) "
                     f"zones={occ or '-'} "
-                    f"events={len(tracker.events)}"
+                    f"events={len(tracker.events)}{sem}"
                 )
                 last_report = now
 
@@ -139,6 +167,8 @@ def main(argv=None) -> int:
                 if spare > 0:
                     time.sleep(spare)
     finally:
+        if tier2 is not None:
+            tier2.stop()
         source.stop()
         import json
         print("\n[tier3] final scene snapshot:")
