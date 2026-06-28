@@ -4,9 +4,9 @@ The live counterpart to the batch `pipeline/` module. Ingests an *unbounded*
 stream (webcam, iPhone, IP camera, robot) and maintains a continuously-updated
 understanding of what is happening, pushed to clients in real time.
 
-> Status: **Phases 1–4 done.** Ingest, Tier 1 (detection+tracking), Tier 3 (scene
-> state + event log), and Tier 2 (gated VLM, off the critical path) run together
-> in real time. The PowerSync push / dashboard is next.
+> Status: ingest, Tier 1 (detection+tracking), Tier 3 (scene state + event log),
+> Tier 2 (gated VLM, off the critical path), and Tier 4 (sync → live dashboard /
+> PowerSync) all run together in real time. The conversational query layer is next.
 
 ## Architecture (tiered cascade)
 
@@ -14,7 +14,8 @@ understanding of what is happening, pushed to clients in real time.
 sources → Tier 1 (YOLO + tracker, always on)   ~real-time, no LLM cost     [done]
         → Tier 2 (gated VLM, on trigger/heartbeat)   ~1 fps, semantic       [done]
         → Tier 3 (scene state + derived event log)                          [done]
-        → PowerSync → dashboard / chat / robot planner                      [next]
+        → Tier 4 sync → live dashboard / PowerSync / robot planner          [done]
+        → conversational query over live + historical state                 [next]
 ```
 
 Data flows Tier 1 → Tier 3: the detector emits `DetectionResult`s, the
@@ -126,10 +127,15 @@ streaming/
     controller.py       Tier2Controller — gating (triggers + heartbeat), off critical path
     fastvlm_mlx.py      FastVLM on MLX (Apple Silicon) backend
     stub.py             StubSceneUnderstander (deterministic, for tests/offline)
-  spike.py              Phase 1 ingest CLI harness
-  run_tier1.py          Phase 2 detection+tracking CLI
-  run_tier3.py          Phase 3/4 CLI (source → Tier 1 → Tier 3, optional --vlm Tier 2)
-  tests/                drop-stale + reconnect + subprocess + scene-state + tier2 tests
+  sync/                 Tier 4 — fan live state + events to clients
+    sink.py             StateSink ABC + SinkHub (fan-out) + StatePublisher
+    dashboard.py        LiveDashboard — FastAPI/SSE browser dashboard sink
+    powersync_sink.py   PowerSyncSink — Postgres writer (PowerSync streams it)
+    powersync.yaml      PowerSync sync rules for the scene_state / scene_events tables
+  spike.py              ingest CLI harness
+  run_tier1.py          detection+tracking CLI
+  run_tier3.py          full-stack CLI (source → Tier 1 → 3, optional --vlm, --dashboard, --powersync)
+  tests/                drop-stale + reconnect + scene-state + tier2 + sync tests
 ```
 
 ## Tier 3 design (scene state)
@@ -148,8 +154,27 @@ streaming/
   idle/low/medium/high, emitting `activity_change` on band crossings.
 - **Semantic slot** is owned by Tier 2 via `note_semantic`; Tier 3 only stores
   it and tracks staleness — graceful degradation if the VLM is down.
-- **Tier-4 seam:** `tracker.events.subscribe(cb)` delivers every event to a sink
-  (the future PowerSync push). Subscriber exceptions are isolated.
+- **Tier-4 seam:** `tracker.events.subscribe(cb)` delivers every event to a sink.
+  Subscriber exceptions are isolated.
+
+## Tier 4 design (sync)
+
+Fan the live scene state + event log out to any number of clients.
+
+- **Swappable sinks.** `StateSink` is the contract; `SinkHub` fans out to many
+  with per-sink error isolation (one bad sink never breaks the pipeline). Built-in:
+  `LiveDashboard` (browser) and `PowerSyncSink` (Postgres → PowerSync).
+- **No state races.** `StatePublisher` snapshots and forwards events **on the
+  pipeline thread** (`tick()` from the run loop; events via subscription), so a
+  reader thread never iterates `SceneState` mid-mutation. Sinks touch only their
+  own buffers.
+- **Live dashboard.** `--dashboard` serves a self-contained page over SSE — bbox
+  canvas, entity table, zones, activity, semantic, and a live event feed. One
+  EventSource connection, native reconnect, no build step.
+- **PowerSync path.** `--powersync` upserts the latest snapshot per stream and
+  appends events to Postgres; `powersync.yaml` streams those rows to every client
+  with offline replay. Writes happen on a background thread (snapshots coalesced
+  drop-stale, events bounded) so a slow DB never stalls Tier 1.
 
 ## Tier 2 design (gated semantic understanding)
 
@@ -190,8 +215,8 @@ to so we adopt it where it actually pays off rather than chasing hype everywhere
 | **RF-DETR** (DINOv2 transformer) | Tier 1 | parked | Leads accuracy/occlusion but heavier & NVIDIA-tuned — a precision-mode swappable option, not the default. |
 | **FastVLM** (Apple, MLX) as Tier-2 default | Tier 2 (done) | **applied** | Gated VLM behind `SceneUnderstander`; off critical path; graceful degradation. Moondream/Qwen3-VL/Gemini are drop-in alternates. |
 | Image/KV caching (encode once, ask many) | Tier 6 chat | parked | The 21.7s→0.78s path — matters for multi-question grounding, not the heartbeat. Add via a `prepare`/`ask` seam on `SceneUnderstander`. |
-| **TOON** (Token-Oriented Object Notation) at the LLM boundary | Tier 4 / chat | parked | ~40% fewer tokens, equal/better parse accuracy, on **uniform arrays** (our `entities[]` + event log). Hybrid: TOON for tables, compact JSON for nested/scalar. Keep JSON `snapshot()` for PowerSync/storage. Pure-Python `toon-format` lib. |
-| **Token benchmark** (JSON vs TOON on a real snapshot) | Tier 4 / chat | parked | Adopt TOON on measured numbers, not blog claims. |
+| **TOON** (Token-Oriented Object Notation) at the LLM boundary | query layer | parked | ~40% fewer tokens, equal/better parse accuracy, on **uniform arrays** (our `entities[]` + event log). Wires in where scene state is fed to an LLM (chat), NOT the JSON sync layer. Hybrid: TOON for tables, compact JSON for nested/scalar. Pure-Python `toon-format` lib. |
+| **Token benchmark** (JSON vs TOON on a real snapshot) | query layer | parked | Adopt TOON on measured numbers, not blog claims. |
 
 ## Tests
 

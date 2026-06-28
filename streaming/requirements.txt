@@ -22,3 +22,10 @@ pytest>=8           # drop-stale / reconnect unit tests
 # pillow   — frame ndarray -> PIL image for the model
 # timm     — pulled in by FastVLM's custom processor code (torch already present)
 # The stub backend (`--vlm stub`) and all tests need NONE of the above.
+
+# --- Tier 4 (sync, optional) ---
+# Live browser dashboard (`--dashboard`):
+#   ./.venv/bin/pip install fastapi uvicorn          # (already present if mlx-vlm installed)
+# PowerSync / Postgres persistence (`--powersync`, needs DATABASE_URL):
+#   ./.venv/bin/pip install "psycopg[binary]"
+# The sync abstraction + tests need NONE of the above.

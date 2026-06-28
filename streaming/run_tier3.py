@@ -23,6 +23,11 @@ Examples (from the repo root, with the streaming venv):
   ./.venv/bin/python -m streaming.run_tier3 --video stock-footage-lab-*.webm --vlm stub
   ./.venv/bin/python -m streaming.run_tier3 --device 0 --vlm fastvlm   # needs: pip install mlx-vlm pillow
 
+  # Live browser dashboard (open http://127.0.0.1:8800):
+  ./.venv/bin/python -m streaming.run_tier3 --device 0 --vlm fastvlm --dashboard
+  # Persist to Postgres for PowerSync (needs DATABASE_URL + psycopg):
+  ./.venv/bin/python -m streaming.run_tier3 --device 0 --powersync
+
 Zone syntax (repeatable):  NAME:KIND:x1,y1,x2,y2   (coords normalized 0..1,
 KIND = area|restricted). Rectangles only from the CLI; richer polygons go
 through the Zone API directly.
@@ -38,6 +43,7 @@ import time
 from streaming.scene import SceneTracker, Zone, ZoneKind
 from streaming.sources.ffmpeg_process import FFmpegProcessSource
 from streaming.sources.pyav_source import PyAVSource
+from streaming.sync import LiveDashboard, SinkHub, StatePublisher
 from streaming.tier1.yolo_detector import YoloDetector
 from streaming.tier2 import StubSceneUnderstander, Tier2Controller
 
@@ -76,6 +82,10 @@ def main(argv=None) -> int:
     p.add_argument("--vlm", choices=["none", "stub", "fastvlm"], default="none",
                    help="Tier 2 semantic backend (default none)")
     p.add_argument("--heartbeat", type=float, default=8.0, help="Tier 2 heartbeat seconds")
+    p.add_argument("--dashboard", nargs="?", const=8800, type=int, default=None,
+                   metavar="PORT", help="serve a live browser dashboard (default port 8800)")
+    p.add_argument("--powersync", action="store_true",
+                   help="persist state+events to Postgres (needs DATABASE_URL + psycopg)")
     args = p.parse_args(argv)
 
     logging.basicConfig(
@@ -105,6 +115,19 @@ def main(argv=None) -> int:
             understander = StubSceneUnderstander(latency_s=0.3)
         tier2 = Tier2Controller(tracker, understander, heartbeat_s=args.heartbeat)
 
+    # Tier 4 (optional): fan live state + events to a dashboard and/or Postgres.
+    publisher = None
+    dashboard = None
+    if args.dashboard is not None or args.powersync:
+        hub = SinkHub()
+        if args.dashboard is not None:
+            dashboard = LiveDashboard(port=args.dashboard)
+            hub.add(dashboard)
+        if args.powersync:
+            from streaming.sync.powersync_sink import PowerSyncSink
+            hub.add(PowerSyncSink())
+        publisher = StatePublisher(tracker, hub, snapshot_interval_s=0.4)
+
     source = _build_source(args)
     stop = {"v": False}
     signal.signal(signal.SIGINT, lambda *_: stop.update(v=True))
@@ -112,6 +135,9 @@ def main(argv=None) -> int:
     source.start()
     if tier2 is not None:
         tier2.start()
+    if dashboard is not None:
+        dashboard.start()
+        print(f"[tier3] dashboard → http://127.0.0.1:{args.dashboard}")
     print(f"[tier3] source started; loading model + warming up… "
           f"zones={[z.name for z in zones]} vlm={args.vlm}")
 
@@ -141,6 +167,8 @@ def main(argv=None) -> int:
             state = tracker.update(result)
             if tier2 is not None:
                 tier2.offer(frame)        # cheap; the worker decides when to look
+            if publisher is not None:
+                publisher.tick(time.monotonic())   # cheap; snapshots on cadence
             processed += 1
 
             now = time.monotonic()
@@ -169,6 +197,8 @@ def main(argv=None) -> int:
     finally:
         if tier2 is not None:
             tier2.stop()
+        if publisher is not None:
+            publisher.close()
         source.stop()
         import json
         print("\n[tier3] final scene snapshot:")

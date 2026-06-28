@@ -1,0 +1,15 @@
+# PowerSync sync rules for the Argus streaming schema.
+#
+# Paste into PowerSync (Sync Streams > Edit) once the Postgres tables from
+# PowerSyncSink.SCHEMA_SQL exist. This global definition streams the live scene
+# state + derived event log to every connected client.
+#
+# To scope per-stream or per-user, add a parameter query (e.g. select request
+# claims) and filter the data queries by it — the schema already carries
+# source_id for that.
+bucket_definitions:
+  argus_global:
+    data:
+      # PowerSync requires a text `id` column on every synced row.
+      - SELECT source_id AS id, source_id, snapshot, updated_at FROM scene_state
+      - SELECT seq::text AS id, source_id, type, ts_wall, message, data, created_at FROM scene_events
